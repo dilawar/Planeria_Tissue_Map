@@ -6,6 +6,7 @@ from PIL import Image, ImageSequence
 import numpy as np
 import itertools
 import pickle
+import math
 import helper
 import cv2
 
@@ -15,6 +16,9 @@ resdir_name_ = '_results'
 datadir_     = None
 infile_      = None
 frames_      = []
+
+if not os.path.isdir( resdir_name_ ):
+    os.makedirs( resdir_name_ )
 
 brightFieldFrame_   = []
 tissueFrames_       = []
@@ -61,15 +65,19 @@ def open_morph(f, times = 1):
       f = cv2.morphologyEx( f, cv2.MORPH_OPEN, kernel )
     return f
 
-def find_orientation( frame ):
-    #  pts = np.where( frame > 1 )
-    #  pts = np.array( [ list(x) for x in list(zip(*pts))] )
-    #  ellipse = cv2.fitEllipse( pts )
-    #  cv2.ellipse(frame, ellipse, 255, 2)
-    #  print( ellipse )
+def ignore_neighbours( vec, min_distance = 10 ):
+    yvec = list(vec[:])
+    newvec = [yvec.pop()]
+    while yvec:
+        y = yvec.pop()
+        if abs(y-newvec[-1]) < min_distance:
+            continue
+        newvec.append(y)
+    return newvec
 
+
+def find_outline( frame ):
     frame = open_morph( frame )
-
     m, u = np.mean(frame), np.std(frame)
     frame[ frame > m + 0.5  ] = 0
     img, cnts, h = cv2.findContours( frame, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE )
@@ -78,33 +86,75 @@ def find_orientation( frame ):
     goodCnts = []
     largestCnts = sorted( [ (cv2.contourArea(c), c) for c in cnts ] )[-1][1]
 
-    cv2.drawContours( f, [largestCnts], -1, 255, 3 )
+    cv2.drawContours( f, [largestCnts], -1, 255, 1 )
     save_frame( f, "temp_cnts.png" )
 
-
     outlineFile = '%s.outline.dat' % infile_ 
-    with open(  outlineFile, 'w' ) as f:
+    with open(  outlineFile, 'w' ) as h:
         for x in largestCnts:
             x = x[0]
-            f.write( '%d %d\n' % (x[0], x[1] ) )
+            h.write( '%d %d\n' % (x[0], x[1] ) )
     print( '[INFO] Wrote outline of animal to %s' % outlineFile )
 
-    return 0
+    return f
 
-def find_animal_shape( frames ):
-    f = np.mean( brightFieldFrame_, axis = 0 )
-    f = f / f.max()
-    f = f - f.mean()
-    f[ f < 0 ] = 0
-    f = 255 * f / f.max()
-    #for i in range(1):
-    #    f = cv2.morphologyEx( f, cv2.MORPH_OPEN, kernel )
+def find_animal( frames ):
 
-    f = cv2.blur(f, (21,21) )
+    fsum = np.sum( frames, axis = 0 )
+    fsum = 255 * fsum / fsum.max()
+    f0 = np.mean( frames, axis = 0 )
+    f0 = f0 / f0.max()
+    f0 = f0 - f0.mean()
+    f0[ f0 < 0 ] = 0
+    f0 = 255 * f0 / f0.max()
 
-    save_frame( f, "aniaml_shape.png" )
+    f = cv2.blur(f0, (11,11) )
+
+    save_frame( np.hstack((fsum,f)), "aniaml_shape.png" )
     return np.uint8( f )
 
+def rotate_by_theta( img, theta ):
+    rows, cols = img.shape
+    M = cv2.getRotationMatrix2D((cols/2,rows/2),theta,1)
+    dst = cv2.warpAffine(img,M,(cols,rows))
+    return dst
+
+def compute_midline_and_rotation( outline ):
+    xvec, midpoints = [], []
+    for i, row in enumerate(outline):
+        pts = np.where( row==255 )[0]
+        if len(pts) == 0:
+            continue
+        pts = ignore_neighbours( pts )
+        if len(pts) == 0:
+            continue
+
+        midP = int(np.mean( pts ))
+        xvec.append(i)
+        midpoints.append( midP )
+        #  outline[i, midP] = 100
+
+    m, c = np.polyfit( xvec, midpoints, 1 )
+    theta = - 180*math.atan(m)/math.pi
+    print( "[INFO ] Rotate by m=%f. Rotate by %f deg" % (m, theta))
+    
+    for x, y in zip(xvec, midpoints):
+        y = int(m*x + c)
+        outline[x, y] = 200
+
+    rotated = rotate_by_theta( outline, theta )
+    save_frame( np.hstack((outline,rotated)), "outline+midline.png" )
+    return rotated, theta
+
+def lame_function( outlineMidline, theta ):
+    global tissueFrames_
+    for i, f in enumerate(tissueFrames_):
+        f = np.uint8( 255 * f / f.max() )
+        print( f.min(), f.max(), f.mean() )
+        newF = rotate_by_theta( f, theta )
+        save_frame( newF
+                , os.path.join( resdir_name_, "f%03d.png" % i )
+                )
 
 def run( infile, ignore_pickle = False ):
     global datadir, infile_
@@ -112,12 +162,12 @@ def run( infile, ignore_pickle = False ):
     infile_ = infile
     read_frames( infile )
 
-    #  meanMarkerFrame = find_markers( tissueFrames_ )
-    f = find_animal_shape( brightFieldFrame_ )
-    theta = find_orientation( f )
-    print( "[INFO ] Theta is %g" % theta )
-    
+    f = find_animal( brightFieldFrame_ )
+    outline = find_outline( f )
+    outlineMidline, theta = compute_midline_and_rotation( outline )
 
+    lame_function( outlineMidline, theta )
+    
     
 def main():
     global infile_
