@@ -11,11 +11,15 @@ import helper
 import cv2
 
 cap_ = None
-
 resdir_name_ = '_results'
 datadir_     = None
 infile_      = None
 frames_      = []
+midline_     = None
+
+# 
+midline_val_          = 200
+midline_straight_val_ = 100
 
 if not os.path.isdir( resdir_name_ ):
     os.makedirs( resdir_name_ )
@@ -128,6 +132,7 @@ def rotate_by_theta( img, theta ):
     return dst
 
 def compute_midline_and_rotation( outline ):
+    global midline_
     xvec, midpoints = [], []
     for i, row in enumerate(outline):
         pts = np.where( row==255 )[0]
@@ -140,9 +145,15 @@ def compute_midline_and_rotation( outline ):
         midP = int(np.mean( pts ))
         xvec.append(i)
         midpoints.append( midP )
-        outline[i, midP] = 200
+        outline[i, midP] = midline_val_
 
+    # save the computed midline in global.
     m, c = np.polyfit( xvec, midpoints, 1 )
+    midline_ = []
+    for x, y in zip(xvec, midpoints):
+        midline_.append((x, int(m*x+c)))
+        outline[x, int(m*x+c)] = midline_straight_val_
+
     theta = - 180*math.atan(m)/math.pi
     print( "[INFO ] Rotate by m=%f. Rotate by %f deg" % (m, theta))
     
@@ -150,14 +161,34 @@ def compute_midline_and_rotation( outline ):
     save_frame( np.hstack((outline,rotated)), "outline+midline.png" )
     return rotated, theta
 
+def shift_to_align( frame, midline ):
+    global midline_val_
+    global midline_
+
+    newframe = np.zeros_like( frame )
+    for i, row in enumerate(midline):
+        midP = np.where( row == midline_val_ )[0]
+        straightMidP = np.where( row == midline_straight_val_)[0]
+        if len(midP) == 0 or len(straightMidP) == 0:
+            newframe[i] = row
+            continue
+
+        d = ( midP[0] - straightMidP[0] )
+        row1 = np.roll(row, d)
+        newframe[i] = row1
+
+    return newframe
+
 def lame_function( outlineMidline, theta ):
     global tissueFrames_
     for i, f in enumerate(tissueFrames_):
         #  empty = np.zeros_like( f )
         f = cv2.equalizeHist( f )
         f = open_morph(f, 2, 7)
-        newF = rotate_by_theta( f, theta )
-        save_frame( np.dstack((outlineMidline, outlineMidline, newF))
+        rotatedF = rotate_by_theta( f, theta )
+        newF = shift_to_align( rotatedF, outlineMidline )
+        save_frame( 
+                np.dstack((outlineMidline, outlineMidline, newF))
                 , os.path.join( resdir_name_, "f%03d.png" % i )
                 )
 
