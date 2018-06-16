@@ -109,9 +109,15 @@ def find_animal( frames ):
     fm = np.uint8( np.mean( frames, axis = 0) )
     f = cv2.blur( fm, (13,13) )
     f = cv2.equalizeHist( fm )
-    f[ f > 200 ] = 100
-    f[ f < f.mean() ] = 255
-    f = open_morph( f, 5)
+    f[ f < f.mean() ] = 0
+    f[ f > 0 ] = 255
+
+    # Swap black and white.
+    f[ f == 0 ] = 100
+    f[ f == 255 ] = 0
+    f[ f == 100 ] = 255
+
+    f = open_morph( f, 5, 51)
     save_frame( f, "aniaml_shape.png" )
     return f
 
@@ -134,16 +140,12 @@ def compute_midline_and_rotation( outline ):
         midP = int(np.mean( pts ))
         xvec.append(i)
         midpoints.append( midP )
-        outline[i, midP] = 100
+        outline[i, midP] = 200
 
     m, c = np.polyfit( xvec, midpoints, 1 )
     theta = - 180*math.atan(m)/math.pi
     print( "[INFO ] Rotate by m=%f. Rotate by %f deg" % (m, theta))
     
-    for x, y in zip(xvec, midpoints):
-        y = int(m*x + c)
-        outline[x, y] = 200
-
     rotated = rotate_by_theta( outline, theta )
     save_frame( np.hstack((outline,rotated)), "outline+midline.png" )
     return rotated, theta
@@ -151,10 +153,11 @@ def compute_midline_and_rotation( outline ):
 def lame_function( outlineMidline, theta ):
     global tissueFrames_
     for i, f in enumerate(tissueFrames_):
+        #  empty = np.zeros_like( f )
         f = cv2.equalizeHist( f )
         f = open_morph(f, 2, 7)
         newF = rotate_by_theta( f, theta )
-        save_frame( np.hstack((newF, outlineMidline))
+        save_frame( np.dstack((outlineMidline, outlineMidline, newF))
                 , os.path.join( resdir_name_, "f%03d.png" % i )
                 )
 
