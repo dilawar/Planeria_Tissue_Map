@@ -35,8 +35,9 @@ def read_frames( infile ):
     global frames_
     with Image.open( infile ) as f:
         for i, page in enumerate(ImageSequence.Iterator(f)):
+            # Its 16 bit data. Make it 8 bit.
             frame = np.array( page )
-            frame = np.array( frame // 2**8, dtype = np.uint8 )
+            frame = np.array(frame / 2**8, dtype = np.uint8 )
             frames_.append( frame )
             if i % 2 == 1:
                 brightFieldFrame_.append(frame)
@@ -59,8 +60,8 @@ def find_markers( frames ):
     f = cv2.morphologyEx( f, cv2.MORPH_OPEN, kernel )
     return f
 
-def open_morph(f, times = 1):
-    kernel = np.ones( (5,5), np.uint8 )
+def open_morph(f, times = 1, N = 11):
+    kernel = np.ones( (N,N), np.uint8 )
     for i in range(times):
       f = cv2.morphologyEx( f, cv2.MORPH_OPEN, kernel )
     return f
@@ -79,14 +80,21 @@ def ignore_neighbours( vec, min_distance = 10 ):
 def find_outline( frame ):
     frame = open_morph( frame )
     m, u = np.mean(frame), np.std(frame)
-    frame[ frame > m + 0.5  ] = 0
-    img, cnts, h = cv2.findContours( frame, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE )
+    frame[ frame < 150  ] = 0
 
     f = np.zeros_like(frame)
-    goodCnts = []
-    largestCnts = sorted( [ (cv2.contourArea(c), c) for c in cnts ] )[-1][1]
+    img, cnts, h = cv2.findContours( frame, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE )
 
-    cv2.drawContours( f, [largestCnts], -1, 255, 1 )
+    if len(cnts) < 1:
+        print( "[WARN ] No contours found. Not doing anything else." )
+        return f
+
+    goodCnts = [ (cv2.contourArea(c), c) for c in cnts ]
+    largestCntsWithArea = sorted( goodCnts, key = lambda x: x[0] )[-1]
+    largestCnts = largestCntsWithArea[1]
+
+    cv2.drawContours( f, cnts, -1, 255, 1 )
+
     save_frame( f, "temp_cnts.png" )
 
     outlineFile = '%s.outline.dat' % infile_ 
@@ -95,23 +103,17 @@ def find_outline( frame ):
             x = x[0]
             h.write( '%d %d\n' % (x[0], x[1] ) )
     print( '[INFO] Wrote outline of animal to %s' % outlineFile )
-
     return f
 
 def find_animal( frames ):
-
-    fsum = np.sum( frames, axis = 0 )
-    fsum = 255 * fsum / fsum.max()
-    f0 = np.mean( frames, axis = 0 )
-    f0 = f0 / f0.max()
-    f0 = f0 - f0.mean()
-    f0[ f0 < 0 ] = 0
-    f0 = 255 * f0 / f0.max()
-
-    f = cv2.blur(f0, (11,11) )
-
-    save_frame( np.hstack((fsum,f)), "aniaml_shape.png" )
-    return np.uint8( f )
+    fm = np.uint8( np.mean( frames, axis = 0) )
+    f = cv2.blur( fm, (13,13) )
+    f = cv2.equalizeHist( fm )
+    f[ f > 200 ] = 100
+    f[ f < f.mean() ] = 255
+    f = open_morph( f, 5)
+    save_frame( f, "aniaml_shape.png" )
+    return f
 
 def rotate_by_theta( img, theta ):
     rows, cols = img.shape
@@ -132,7 +134,7 @@ def compute_midline_and_rotation( outline ):
         midP = int(np.mean( pts ))
         xvec.append(i)
         midpoints.append( midP )
-        #  outline[i, midP] = 100
+        outline[i, midP] = 100
 
     m, c = np.polyfit( xvec, midpoints, 1 )
     theta = - 180*math.atan(m)/math.pi
@@ -149,10 +151,10 @@ def compute_midline_and_rotation( outline ):
 def lame_function( outlineMidline, theta ):
     global tissueFrames_
     for i, f in enumerate(tissueFrames_):
-        f = np.uint8( 255 * f / f.max() )
-        print( f.min(), f.max(), f.mean() )
+        f = cv2.equalizeHist( f )
+        f = open_morph(f, 2, 7)
         newF = rotate_by_theta( f, theta )
-        save_frame( newF
+        save_frame( np.hstack((newF, outlineMidline))
                 , os.path.join( resdir_name_, "f%03d.png" % i )
                 )
 
@@ -165,7 +167,6 @@ def run( infile, ignore_pickle = False ):
     f = find_animal( brightFieldFrame_ )
     outline = find_outline( f )
     outlineMidline, theta = compute_midline_and_rotation( outline )
-
     lame_function( outlineMidline, theta )
     
     
