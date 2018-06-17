@@ -4,11 +4,13 @@ import os
 import sys
 from PIL import Image, ImageSequence
 import numpy as np
+import scipy.ndimage 
 import itertools
 import pickle
 import math
 import helper
 import cv2
+import matplotlib.pyplot as plt
 
 cap_ = None
 resdir_name_ = '_results'
@@ -126,13 +128,18 @@ def find_animal( frames ):
     return f
 
 def rotate_by_theta( img, theta ):
+    # make sure NOT TO interpolate data using higher order function else rest of
+    # the algorithm will break. We use pixel values in many frame to locate
+    # coordinates such as midpoint, outline etc.
+    #  return scipy.ndimage.rotate( img, theta, order=0, reshape = False )
     rows, cols = img.shape
     M = cv2.getRotationMatrix2D((cols/2,rows/2),theta,1)
-    dst = cv2.warpAffine(img,M,(cols,rows))
-    return dst
+    return cv2.warpAffine(img,M,(cols,rows), flags=cv2.INTER_NEAREST)
 
 def compute_midline_and_rotation( outline ):
-    global midline_
+    # Given outline, compute the midline. Fit it with a line and rotate the
+    # frame by line angle. After rotation, we must have a straight vertical line
+    # (using np.polyfit) as midline along with the midline before linear fit.
     xvec, midpoints = [], []
     for i, row in enumerate(outline):
         pts = np.where( row==255 )[0]
@@ -149,48 +156,65 @@ def compute_midline_and_rotation( outline ):
 
     # save the computed midline in global.
     m, c = np.polyfit( xvec, midpoints, 1 )
-    midline_ = []
     for x, y in zip(xvec, midpoints):
-        midline_.append((x, int(m*x+c)))
-        outline[x, int(m*x+c)] = midline_straight_val_
+        y = int(m*x+c)
+        #  outline[x:x+3, y:y+3] = midline_straight_val_
+        outline[x, y] = midline_straight_val_
 
     theta = - 180*math.atan(m)/math.pi
     print( "[INFO ] Rotate by m=%f. Rotate by %f deg" % (m, theta))
     
     rotated = rotate_by_theta( outline, theta )
-    save_frame( np.hstack((outline,rotated)), "outline+midline.png" )
-    return rotated, theta
+    save_frame( np.hstack((outline,rotated)), "outline+midline+rotated.png" )
 
-def shift_to_align( frame, midline ):
+    return theta
+
+def straighten_frame( frame, midline ):
     global midline_val_
-    global midline_
-
     newframe = np.zeros_like( frame )
     for i, row in enumerate(midline):
         midP = np.where( row == midline_val_ )[0]
         straightMidP = np.where( row == midline_straight_val_)[0]
-        if len(midP) == 0 or len(straightMidP) == 0:
-            newframe[i] = row
-            continue
-
-        d = ( midP[0] - straightMidP[0] )
-        row1 = np.roll(row, d)
-        newframe[i] = row1
-
+        if len(midP) > 0 and len(straightMidP) > 0:
+            d = midP[0] - straightMidP[0]
+            row = np.roll(row, -d)
+        newframe[i] = row 
     return newframe
 
-def lame_function( outlineMidline, theta ):
+def shift_to_align( frames, midline ):
+    # Make sure to rotate outline as well. After rotation both lines may get
+    # distorted and any algorithm using straight midline and midline diff
+    # may not work. Do row to row comparision.
+    res = []
+    for frame in frames:
+        newframe = straighten_frame(frame, midline)
+        res.append(newframe)
+    assert len(res) == len(frames)
+    return res
+
+
+def lame_function( outline, theta ):
+    # We are given outline and angle to rotate. Outline has not been rotated
+    # yet.
     global tissueFrames_
+    grid = helper.create_grid( np.zeros_like(outline), 50 )
+
     for i, f in enumerate(tissueFrames_):
-        #  empty = np.zeros_like( f )
         f = cv2.equalizeHist( f )
+        # CRITICAL: remove some noise. 
         f = open_morph(f, 2, 7)
-        rotatedF = rotate_by_theta( f, theta )
-        newF = shift_to_align( rotatedF, outlineMidline )
-        save_frame( 
-                np.dstack((outlineMidline, outlineMidline, newF))
-                , os.path.join( resdir_name_, "f%03d.png" % i )
-                )
+
+        original = [ f, outline ]
+        rotated = [rotate_by_theta( x, theta ) for x in original] 
+
+        finalFs = shift_to_align( rotated, rotate_by_theta(outline,theta) )
+
+        helper.save_frames(  
+            [ np.dstack( helper.pad_frames(original + [grid]) )
+                , np.dstack( helper.pad_frames(rotated + [grid]) ) 
+                , np.dstack( helper.pad_frames( finalFs + [grid]) )
+            ],  outfile = os.path.join( resdir_name_, "f%03d.png" % i )
+            )
 
 def run( infile, ignore_pickle = False ):
     global datadir, infile_
@@ -200,8 +224,9 @@ def run( infile, ignore_pickle = False ):
 
     f = find_animal( brightFieldFrame_ )
     outline = find_outline( f )
-    outlineMidline, theta = compute_midline_and_rotation( outline )
-    lame_function( outlineMidline, theta )
+
+    theta = compute_midline_and_rotation( outline )
+    lame_function( outline, theta )
     
     
 def main():
