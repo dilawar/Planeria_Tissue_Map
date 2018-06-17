@@ -15,10 +15,7 @@ import cv2
 import io
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-try:
-    plt.style.use('classic' )
-except Exception as e:
-    pass
+plt.style.use('classic' )
 
 
 def lines_to_dataframe( lines ):
@@ -75,11 +72,11 @@ def create_grid( frame, step ):
     return frame
 
 def save_frames( frames, outfile ):
-
-    plt.figure()
+    plt.figure( figsize=(6,8) )
     for i, frame in enumerate(frames):
         ax = plt.subplot( 1, len(frames), i+1 )
         ax.imshow( frame, interpolation = 'none', aspect = 'auto' )
+        #  ax.axis( 'off' )
 
     plt.tight_layout( )
     plt.savefig( outfile )

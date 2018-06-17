@@ -10,7 +10,6 @@ import pickle
 import math
 import helper
 import cv2
-import matplotlib.pyplot as plt
 
 cap_ = None
 resdir_name_ = '_results'
@@ -213,7 +212,7 @@ def lame_function( outline, theta ):
         finalFs = helper.rescale( finalFs, nrows = 1000 )
 
         toPlot = [ np.dstack( helper.pad_frames(original + [grid]) )
-                , np.dstack( helper.pad_frames(rotated + [grid]) ) 
+                #  , np.dstack( helper.pad_frames(rotated + [grid]) )
                 , np.dstack( helper.pad_frames( finalFs +
                     [helper.create_grid(finalFs[0], 50)]) )
                 ]
