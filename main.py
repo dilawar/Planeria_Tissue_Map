@@ -177,7 +177,7 @@ def straighten_frame( frame, midline ):
         straightMidP = np.where( row == midline_straight_val_)[0]
         if len(midP) > 0 and len(straightMidP) > 0:
             d = midP[0] - straightMidP[0]
-            row = np.roll(row, -d)
+            row = np.roll(frame[i], -d)
         newframe[i] = row 
     return newframe
 
