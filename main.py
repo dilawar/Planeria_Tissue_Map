@@ -209,12 +209,17 @@ def lame_function( outline, theta ):
 
         finalFs = shift_to_align( rotated, rotate_by_theta(outline,theta) )
 
-        helper.save_frames(  
-            [ np.dstack( helper.pad_frames(original + [grid]) )
+        finalFs = helper.crop_these_frames( finalFs )
+
+        toPlot = [ np.dstack( helper.pad_frames(original + [grid]) )
                 , np.dstack( helper.pad_frames(rotated + [grid]) ) 
-                , np.dstack( helper.pad_frames( finalFs + [grid]) )
-            ],  outfile = os.path.join( resdir_name_, "f%03d.png" % i )
-            )
+                , np.dstack( helper.pad_frames( finalFs +
+                    [helper.create_grid(finalFs[0], 50)]) )
+                ]
+
+        helper.save_frames(toPlot
+                , outfile = os.path.join( resdir_name_, "f%03d.png" % i )
+                )
 
 def run( infile, ignore_pickle = False ):
     global datadir, infile_

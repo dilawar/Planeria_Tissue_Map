@@ -84,3 +84,35 @@ def save_frames( frames, outfile ):
     plt.savefig( outfile )
     plt.close( )
     
+def crop_these_frames( frames, thres = 1 ):
+    crop = [0, 0, 0, 0]
+    newF = np.mean( frames, axis = 0 )
+
+    # top to bottom.
+    nrow, ncols = newF.shape
+    for i in range(0, nrow, 1):
+        if np.mean(newF[i,:]) > thres:
+            crop[0] = i
+            break
+
+    # bottom to top.
+    for i in range(nrow-1, 0, -1):
+        if np.mean(newF[i,:]) > thres:
+            crop[1] = i
+            break
+
+    # left to right.
+    for i in range(ncols):
+        if np.mean(newF[:,i]) > thres:
+            crop[2] = i
+            break
+
+    for i in range(ncols-1,0,-1):
+        if np.mean(newF[:,i]) > thres:
+            crop[3] = i
+            break
+
+    rowA, rowB, colA, colB = crop
+    print( "[CROP] Rows %d:%d Cols: %d:%d" % (rowA,rowB,colA,colB) )
+    return [x[rowA:rowB,colA:colB] for x in frames]
+
