@@ -210,6 +210,7 @@ def lame_function( outline, theta ):
         finalFs = shift_to_align( rotated, rotate_by_theta(outline,theta) )
 
         finalFs = helper.crop_these_frames( finalFs )
+        finalFs = helper.rescale( finalFs, nrows = 1000 )
 
         toPlot = [ np.dstack( helper.pad_frames(original + [grid]) )
                 , np.dstack( helper.pad_frames(rotated + [grid]) ) 

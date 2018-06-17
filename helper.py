@@ -11,6 +11,7 @@ __status__           = "Development"
 
 import pandas as pd
 import numpy as np
+import cv2
 import io
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -116,3 +117,9 @@ def crop_these_frames( frames, thres = 1 ):
     print( "[CROP] Rows %d:%d Cols: %d:%d" % (rowA,rowB,colA,colB) )
     return [x[rowA:rowB,colA:colB] for x in frames]
 
+def scale_frame( frame, height ):
+    ration = height / frame.shape[0] 
+    return cv2.resize( frame, (0,0), fx=ration, fy=ration )
+
+def rescale( frames, nrows ):
+    return [ scale_frame(f, nrows) for f in frames ]
