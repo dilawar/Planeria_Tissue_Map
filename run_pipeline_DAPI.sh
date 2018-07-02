@@ -10,11 +10,11 @@ done
 
 echo "\n\nDone processing raw TIFF files"
 
-echo "== Ananlyzing eyes"
-EYEFILES=$(find . -type f -name "*processed*eye*.tif")
+EYEFILES=$(find $DIRNAME -type f -name "*processed.eye.tif")
+echo "== Ananlyzing eyes $EYEFILES"
 python3 ./gen_heatmap.py $EYEFILES
 
-echo "== Ananlyzing brain"
-EYEFILES=$(find . -type f -name "*processed*brain*.tif")
-python3 ./gen_heatmap.py $EYEFILES
+BRAINFILES=$(find $DIRNAME -type f -name "*processed.brain.tif")
+echo "== Ananlyzing brain $BRAINFILES"
+python3 ./gen_heatmap.py $BRAINFILES
 
