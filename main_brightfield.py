@@ -19,10 +19,6 @@ infile_      = None
 frames_      = []
 midline_     = None
 
-# 
-midline_val_          = 200
-midline_straight_val_ = 100
-
 if not os.path.isdir( resdir_name_ ):
     os.makedirs( resdir_name_ )
 
@@ -152,14 +148,13 @@ def compute_midline_and_rotation( outline ):
         midP = int(np.mean( pts ))
         xvec.append(i)
         midpoints.append( midP )
-        outline[i, midP] = midline_val_
+        outline[i, midP] = helper.midline_val_
 
     # save the computed midline in global.
     m, c = np.polyfit( xvec, midpoints, 1 )
     for x, y in zip(xvec, midpoints):
         y = int(m*x+c)
-        #  outline[x:x+3, y:y+3] = midline_straight_val_
-        outline[x, y] = midline_straight_val_
+        outline[x, y] = helper.midline_straight_val_
 
     theta = - 180*math.atan(m)/math.pi
     print( "[INFO ] Rotate by m=%f. Rotate by %f deg" % (m, theta))
@@ -169,25 +164,13 @@ def compute_midline_and_rotation( outline ):
 
     return theta
 
-def straighten_frame( frame, midline ):
-    global midline_val_
-    newframe = np.zeros_like( frame )
-    for i, row in enumerate(midline):
-        midP = np.where( row == midline_val_ )[0]
-        straightMidP = np.where( row == midline_straight_val_)[0]
-        if len(midP) > 0 and len(straightMidP) > 0:
-            d = midP[0] - straightMidP[0]
-            row = np.roll(frame[i], -d)
-        newframe[i] = row 
-    return newframe
-
 def shift_to_align( frames, midline ):
     # Make sure to rotate outline as well. After rotation both lines may get
     # distorted and any algorithm using straight midline and midline diff
     # may not work. Do row to row comparision.
     res = []
     for frame in frames:
-        newframe = straighten_frame(frame, midline)
+        newframe = helper.straighten_frame(frame, midline)
         res.append(newframe)
     assert len(res) == len(frames)
     return res

@@ -17,6 +17,26 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 plt.style.use('classic' )
 
+midline_val_          = 200
+midline_straight_val_ = 100
+
+def straighten_frame( frame, midline ):
+    global midline_val_
+    newframe = np.zeros_like( frame )
+    for i, row in enumerate(midline):
+        midP = np.where( row == midline_val_ )[0]
+        straightMidP = np.where( row == midline_straight_val_)[0]
+        if len(midP) > 0 and len(straightMidP) > 0:
+            d = midP[0] - straightMidP[0]
+            if abs(d) > 0:
+                row = np.roll(frame[i], -d)
+                newframe[i] = row 
+            else:
+                newframe[i] = frame[i]
+        else:
+            newframe[i] = frame[i]
+    return newframe
+
 
 def lines_to_dataframe( lines ):
     cols = 't1,t2,s1,a,b,c,d,e,f,g,h,status,sig1,sig2'.split(',')
