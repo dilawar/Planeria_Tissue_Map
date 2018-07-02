@@ -10,6 +10,7 @@ import pickle
 import math
 import helper
 import cv2
+import tifffile
 
 cap_ = None
 resdir_name_ = '_results'
@@ -198,6 +199,7 @@ def lame_function( outline, theta ):
     global tissueFrames_
     grid = helper.create_grid( np.zeros_like(outline), 50 )
 
+    tiff = []
     for i, f in enumerate(tissueFrames_):
         f = cv2.equalizeHist( f )
         # CRITICAL: remove some noise. 
@@ -220,6 +222,9 @@ def lame_function( outline, theta ):
         helper.save_frames(toPlot
                 , outfile = os.path.join( resdir_name_, "f%03d.png" % i )
                 )
+        tiff += finalFs
+
+    return np.array(tiff, dtype=np.uint8)
 
 def run( infile, ignore_pickle = False ):
     global datadir, infile_
@@ -231,7 +236,13 @@ def run( infile, ignore_pickle = False ):
     outline = find_outline( f )
 
     theta = compute_midline_and_rotation( outline )
-    lame_function( outline, theta )
+    tiff = lame_function( outline, theta )
+
+    #  im = Image.open( '%s.processed.tif' % infile , 'w')
+    #  im.fromarray( tiff )
+    outfile = '%s.processed.tif' % infile 
+    tifffile.imsave( outfile, tiff )
+    print( 'Done saving result. %s' % outfile )
     
     
 def main():
