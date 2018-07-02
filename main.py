@@ -222,7 +222,8 @@ def lame_function( outline, theta ):
         helper.save_frames(toPlot
                 , outfile = os.path.join( resdir_name_, "f%03d.png" % i )
                 )
-        tiff += finalFs
+        tiff.append(np.dstack( helper.pad_frames( finalFs +
+            [helper.create_grid(finalFs[0], 50)])))
 
     return np.array(tiff, dtype=np.uint8)
 
