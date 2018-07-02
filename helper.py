@@ -28,11 +28,8 @@ def straighten_frame( frame, midline ):
         straightMidP = np.where( row == midline_straight_val_)[0]
         if len(midP) > 0 and len(straightMidP) > 0:
             d = midP[0] - straightMidP[0]
-            if abs(d) > 0:
-                row = np.roll(frame[i], -d)
-                newframe[i] = row 
-            else:
-                newframe[i] = frame[i]
+            row = np.roll(frame[i], -d)
+            newframe[i] = row 
         else:
             newframe[i] = frame[i]
     return newframe
@@ -137,6 +134,10 @@ def crop_these_frames( frames, thres = 1 ):
 def scale_frame( frame, height ):
     ration = height / frame.shape[0] 
     return cv2.resize( frame, (0,0), fx=ration, fy=ration )
+
+def scale_frame_width( frame, width ):
+    ration = width / frame.shape[1] 
+    return cv2.resize( frame, (0,0), fx=ration, fy=1 )
 
 def rescale( frames, nrows ):
     return [ scale_frame(f, nrows) for f in frames ]
