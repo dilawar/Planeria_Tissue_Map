@@ -237,7 +237,7 @@ def run( infile, ignore_pickle = False ):
 
     brain = lame_function( outline, theta, brainFrame_ )
     outfile = '%s.processed.brain.tif' % infile 
-    tifffile.imsave( outfile, eye )
+    tifffile.imsave( outfile, brain )
     print( 'Done saving result. %s' % outfile )
     
     
