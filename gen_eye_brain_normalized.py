@@ -115,21 +115,20 @@ def find_outline( frame ):
     return f
 
 def find_animal( frames ):
-    fm = np.uint8( np.mean( frames, axis = 0) )
+    # In this method, we threhold the image and use open_morph action to get the
+    # outline. Probably contour deetection will also work. But this is good
+    # function. One can compare with find_outline function as well.
+    # Not sure why we using this. NOTES are no longer available.
+    f = np.mean( frames, axis = 0)
+    f = 255* f / f.max()
+    f = np.uint8( f )
     #  f = cv2.equalizeHist( fm )
-    f = cv2.blur( fm, (13,13) )
+    #  f = cv2.blur( fm, (13,13) )
+    save_frame( f, 'mean.png' )
+    print( f.mean(), f.std() )
 
-    #  save_frame( f, 'mean.png' )
-    #  print( f.mean(), f.std() )
-
-    # Inside of animal must be white for shape algorithm to work.
-    f[ f > f.mean() ] = 0
-    f[ f > 0 ] = 255
-
-    # Swap black and white.
-    f[ f == 0 ] = 100
-    f[ f == 255 ] = 0
-    f[ f == 100 ] = 255
+    f[f > f.mean()] = 255
+    f[ f != 255 ] = 0
 
     f = open_morph( f, 5, 51)
     save_frame( f, "aniaml_shape.png" )
@@ -227,7 +226,7 @@ def run( infile, ignore_pickle = False ):
     infile_ = infile
     read_frames( infile )
 
-    f = find_animal( dapiFrames_ )
+    f = find_animal( brightFieldFrame_ )
     outline = find_outline( f )
     theta = compute_midline_and_rotation( outline )
 
